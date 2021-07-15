@@ -9,6 +9,10 @@ float hPa_to_inHg(float value_hPa)
   return 0.02953 * value_hPa;
 }
 
+float hPa_to_mmHg(float value_hPa) {
+  return 0.75006 * value_hPa;
+}
+
 int JulianDate(int d, int m, int y) {
   int mm, yy, k1, k2, k3, j;
   yy = y - (int)((12 - m) / 10);

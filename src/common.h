@@ -15,6 +15,12 @@ void Convert_Readings_to_Imperial() {
   WxForecast[1].Snowfall   = mm_to_inches(WxForecast[1].Snowfall);
 }
 
+void Convert_Readings_to_Russian() { // Only the first 3-hours are used
+  WxConditions[0].Pressure = hPa_to_mmHg(WxConditions[0].Pressure);
+  // WxForecast[0].Rainfall   = mm_to_inches(WxForecast[0].Rainfall);
+  // WxForecast[0].Snowfall   = mm_to_inches(WxForecast[0].Snowfall);
+}
+
 //#########################################################################################
 // Problems with stucturing JSON decodes, see here: https://arduinojson.org/assistant/
 bool DecodeWeather(WiFiClient& json, String Type) {
@@ -90,6 +96,7 @@ bool DecodeWeather(WiFiClient& json, String Type) {
     if (pressure_trend == 0) WxConditions[0].Trend = "0";
 
     if (Units == "I") Convert_Readings_to_Imperial();
+    if (Units == "R") Convert_Readings_to_Russian();
   }
   return true;
 }
@@ -99,7 +106,7 @@ String ConvertUnixTime(int unix_time) {
   time_t tm = unix_time;
   struct tm *now_tm = localtime(&tm);
   char output[40];
-  if (Units == "M") {
+  if (Units == "M" || Units == "R") {
     strftime(output, sizeof(output), "%H:%M %d/%m/%y", now_tm);
   }
   else {
@@ -111,7 +118,7 @@ String ConvertUnixTime(int unix_time) {
 //WiFiClient client; // wifi client object
 
 bool obtain_wx_data(WiFiClient& client, const String& RequestType) {
-  const String units = (Units == "M" ? "metric" : "imperial");
+  const String units = (Units == "I" ? "imperial" : "metric");
   client.stop(); // close connection before sending a new request
   HTTPClient http;
   String uri = "/data/2.5/" + RequestType + "?q=" + City + "," + Country + "&APPID=" + apikey + "&mode=json&units=" + units + "&lang=" + Language;
