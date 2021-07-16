@@ -28,7 +28,13 @@ Download the software to your Arduino's library directory.
 
 3. Edit the owm_credentials.h file in the IDE (TAB at top of IDE) and change your Language, Country, choose your units Metric or Imperial and be sure to find a valid weather station location on OpenWeatherMap, if your display has all blank values your location does not exist!
 
-4. Save your files.
+4. If your are using the older style Waveshare HAT then you need to use:
+  
+  **display.init();**//for older Waveshare HAT's 
+  
+  In the InitialiseDisplay() function, comment out as required 
+
+5. Save your files.
 
 NOTE: See schematic for the wiring diagram, all displays are wired the same, so wire a 7.5" the same as a 4.2", 2.9" or 1.54" display! Both 2.13" TTGO T5 and 2.7" T5S boards come pre-wired.
 
@@ -44,7 +50,7 @@ Compile and upload the code - Enjoy!
 
 ![alt text width="600"](/Waveshare_7_5.jpg)
 
-4.2" E-Paper Layout
+4.2" 400x300 E-Paper Layout
 
 ![alt_text, width="400"](/Waveshare_4_2.jpg)
 
@@ -56,7 +62,7 @@ Compile and upload the code - Enjoy!
 
 ![alt_text, width="200"](/Waveshare_2_13.jpg)
 
-1.54" E-Paper Layout
+1.54" 200x200 E-Paper Layout
 
 ![alt_text, width="200"](/Waveshare_1_54.jpg)
 
@@ -69,3 +75,6 @@ See here: https://github.com/ZinggJM/GxEPD2/releases/tag/1.2.10
 Modify this line in the code:
 
 display.init(115200, true, 2); // init(uint32_t serial_diag_bitrate, bool initial, uint16_t reset_duration, bool pulldown_rst_mode)
+
+Wiring Schematic for ALL Waveshare E-Paper Displays
+![alt_text, width="300"](/Schematic.JPG)

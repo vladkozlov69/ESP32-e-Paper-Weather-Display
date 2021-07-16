@@ -23,58 +23,34 @@
 #include <WiFi.h>              // Built-in
 #include "time.h"              // Built-in
 #include <SPI.h>               // Built-in 
-#define  ENABLE_GxEPD2_display 0
 #include <GxEPD2_BW.h>         // GxEPD2 from Sketch, Include Library, Manage Libraries, search for GxEDP2
 #include <GxEPD2_3C.h>
 #include <Fonts/FreeMonoBold12pt7b.h>
 #include "epaper_fonts.h"
 #include "forecast_record.h"
+#include "M5CoreInk.h"
+#include "esp_adc_cal.h"
 
 #define SCREEN_WIDTH  200
 #define SCREEN_HEIGHT 200
 
+RTC_TimeTypeDef RTCtime;
+RTC_DateTypeDef RTCDate;
+
+char timeStrbuff[64];
+
 enum alignment {LEFT, RIGHT, CENTER};
 
-// Connections for e.g. LOLIN D32
-static const uint8_t EPD_BUSY = 4;  // to EPD BUSY
-static const uint8_t EPD_CS   = 5;  // to EPD CS
-static const uint8_t EPD_RST  = 16; // to EPD RST
-static const uint8_t EPD_DC   = 17; // to EPD DC
-static const uint8_t EPD_SCK  = 18; // to EPD CLK
+// Connections for M5-CoreInk
+static const uint8_t EPD_BUSY = 4;
+static const uint8_t EPD_CS   = 9;
+static const uint8_t EPD_RST  = 0;
+static const uint8_t EPD_DC   = 15;
+static const uint8_t EPD_SCK  = 18;
 static const uint8_t EPD_MISO = 19; // Master-In Slave-Out not used, as no data from display
-static const uint8_t EPD_MOSI = 23; // to EPD DIN
+static const uint8_t EPD_MOSI = 23;
 
-// Connections for e.g. Waveshare ESP32 e-Paper Driver Board
-//static const uint8_t EPD_BUSY = 25;
-//static const uint8_t EPD_CS   = 15;
-//static const uint8_t EPD_RST  = 26; 
-//static const uint8_t EPD_DC   = 27; 
-//static const uint8_t EPD_SCK  = 13;
-//static const uint8_t EPD_MISO = 12; // Master-In Slave-Out not used, as no data from display
-//static const uint8_t EPD_MOSI = 14;
-
-// pins_arduino.h, e.g. LOLIN D32 Pro
-//static const uint8_t EPD_BUSY = 13;
-//static const uint8_t EPD_CS   = 5;
-//static const uint8_t EPD_RST  = 2;
-//static const uint8_t EPD_DC   = 15;
-//static const uint8_t EPD_SCK  = 18;
-//static const uint8_t EPD_MISO = 19; // Master-In Slave-Out not used, as no data from display
-//static const uint8_t EPD_MOSI = 23;
-
-// Try one of these for your display
-//GxEPD2_3C<GxEPD2_154c, GxEPD2_154c::HEIGHT> display(GxEPD2_154c(/*CS=5*/ SS, /*DC=17*/ 17, /*RST=16*/ 16, /*BUSY=4*/ 4));     // 3-Colour display
-//GxEPD2_BW<GxEPD2_154_D67, GxEPD2_154_D67::HEIGHT> display(GxEPD2_154_D67(/*CS*/ EPD_CS, /*DC*/ EPD_DC, /*RST*/ EPD_RST, /*BUSY*/ EPD_BUSY)); // New version of 2-Colour display (B/W) GDEH0154D67 or Waveshare 1.54 V2
-//GxEPD2_BW<GxEPD2_154_M09, GxEPD2_154_M09::HEIGHT> display(GxEPD2_154_M09(/*CS*/ EPD_CS, /*DC*/ EPD_DC, /*RST*/ EPD_RST, /*BUSY*/ EPD_BUSY)); // GDEW0154M09 200x200
-GxEPD2_BW<GxEPD2_154, GxEPD2_154::HEIGHT> display(GxEPD2_154(/*CS=5*/ EPD_CS, /*DC=17*/ EPD_DC, /*RST=16*/ EPD_RST, /*BUSY=4*/ EPD_BUSY)); // 2-Colour display (B/W)
-
-// Lolin D32 ProGxEPD2_3C<GxEPD2_154c, GxEPD2_154c::HEIGHT> display(GxEPD2_154c(/*CS*/ EPD_CS, /*DC*/ EPD_CS, /*RST*/ EPD_RST, /*BUSY*/ EPD_BUSY)); // 3-Colour display
-// GxEPD2_3C<GxEPD2_154c, GxEPD2_154c::HEIGHT> display(GxEPD2_154c(/*CS*/ EPD_CS, /*DC*/ EPD_DC, /*RST*/ EPD_RST, /*BUSY*/ EPD_BUSY)); // 3-Colour display
-
-// For 3-Colour displays use: // If you want to colour text use GxEPD_RED or GxEPD_YELLOW in place of GxEPD_BLACK
-//GxEPD2_BW<GxEPD2_154, GxEPD2_154::HEIGHT> display(GxEPD2_154(/*CS*/ EPD_CS, /*DC*/ EPD_DC, /*RST*/ EPD_RST, /*BUSY*/ EPD_BUSY));
-// For 2-Colour displays (B/W) use:
-//GxEPD2_3C<GxEPD2_154, GxEPD2_154c::HEIGHT> display(GxEPD2_154c(/*CS*/ EPD_CS, /*DC*/ EPD_DC, /*RST*/ EPD_RST, /*BUSY*/ EPD_BUSY));
+GxEPD2_BW<GxEPD2_154_M09, GxEPD2_154_M09::HEIGHT> display(GxEPD2_154_M09(/*CS*/ EPD_CS, /*DC*/ EPD_DC, /*RST*/ EPD_RST, /*BUSY*/ EPD_BUSY)); // GDEW0154M09 200x200
 
 //################  VERSION  ##########################
 String version = "1.4";      // Version of this program
@@ -110,10 +86,13 @@ int  SleepTime     = 23; // Sleep after (23+1) 00:00 to save battery power
 
 //#########################################################################################
 void setup() {
+  Serial.begin(115200);  
+  M5.begin(false, false, true);
   StartTime = millis();
-  Serial.begin(115200);
-  if (StartWiFi() == WL_CONNECTED && SetupTime() == true) {
-    if ((CurrentHour >= WakeupTime && CurrentHour <= SleepTime)) {
+
+  UpdateLocalTimeFromRTC();  
+  if (RTCDate.Year < 2021 || (CurrentHour >= WakeupTime && CurrentHour <= SleepTime)) {
+    if (StartWiFi() == WL_CONNECTED && SetupTime() == true) {
       InitialiseDisplay(); // Give screen time to initialise by getting weather data!
       byte Attempts = 1;
       WiFiClient client;   // wifi client object
@@ -128,25 +107,24 @@ void setup() {
         display.display(false); // Full screen update mode
       }
     }
-    BeginSleep();
   }
+  BeginSleep();
 }
 //#########################################################################################
 void loop() { // this will never run!
 }
 //#########################################################################################
 void BeginSleep() {
-  display.powerOff();
-  long SleepTimer = (SleepDuration * 60 - ((CurrentMin % SleepDuration) * 60 + CurrentSec)); //Some ESP32 are too fast to maintain accurate time
+  UpdateLocalTimeFromRTC();  
+  long SleepTimer = (SleepDuration * 60 - ((CurrentMin % SleepDuration) * 60 + CurrentSec)) + 20; //Some ESP32 are too fast to maintain accurate time
   esp_sleep_enable_timer_wakeup((SleepTimer+20) * 1000000LL); // Added +20 seconnds to cover ESP32 RTC timer source inaccuracies
-#ifdef BUILTIN_LED
-  pinMode(BUILTIN_LED, INPUT); // If it's On, turn it off and some boards use GPIO-5 for SPI-SS, which remains low after screen use
-  digitalWrite(BUILTIN_LED, HIGH);
-#endif
   Serial.println("Entering " + String(SleepTimer) + "-secs of sleep time");
   Serial.println("Awake for : " + String((millis() - StartTime) / 1000.0, 3) + "-secs");
+  M5.shutdown((int)SleepTimer); // deep sleep if on battery
+  delay(500);
+  // low power if on usb
   Serial.println("Starting deep-sleep period...");
-  esp_deep_sleep_start();      // Sleep for e.g. 30 minutes
+  esp_deep_sleep_start();
 }
 //#########################################################################################
 void DisplayWeather() {                                    // 1.54" e-paper display is 200x200 resolution
@@ -170,11 +148,31 @@ void DisplayTempHumiSection(int x, int y) {
   display.setTextSize(1);
   drawString(x + 60,  y + 83, String(WxConditions[0].Humidity, 0) + "% RH", CENTER);                               // Show Humidity
 }
+
+
+float getBatVoltage()
+{
+    analogSetPinAttenuation(35,ADC_11db);
+    esp_adc_cal_characteristics_t *adc_chars = (esp_adc_cal_characteristics_t *)calloc(1, sizeof(esp_adc_cal_characteristics_t));
+    esp_adc_cal_characterize(ADC_UNIT_1, ADC_ATTEN_DB_11, ADC_WIDTH_BIT_12, 3600, adc_chars);
+    uint16_t ADCValue = analogRead(35);
+    
+    uint32_t BatVolmV  = esp_adc_cal_raw_to_voltage(ADCValue,adc_chars);
+    float BatVol = float(BatVolmV) * 25.1 / 5.1 / 1000;
+    return BatVol;
+}
+
+
 //#########################################################################################
 void DisplayHeadingSection() {
   drawString(2, 2, Time_str, LEFT);
   drawString(SCREEN_WIDTH - 2, 0, Date_str, RIGHT);
-  drawString(SCREEN_WIDTH / 2, 0, version, CENTER);
+
+  char batteryStrBuff[64];
+  int batPerc = (int)(123-(123/(powf(1+powf(getBatVoltage()/3.7f, 80), 0.165f))));
+  sprintf(batteryStrBuff,"%d %%", batPerc);  
+  Serial.println(batteryStrBuff);
+  drawString(SCREEN_WIDTH / 2, 0, batteryStrBuff, CENTER);
   display.drawLine(0, 12, SCREEN_WIDTH, 12, GxEPD_BLACK);
 }
 //#########################################################################################
@@ -290,7 +288,24 @@ boolean SetupTime() {
   bool TimeStatus = UpdateLocalTime();
   return TimeStatus;
 }
+
 //#########################################################################################
+boolean UpdateLocalTimeFromRTC() {
+  M5.rtc.GetTime(&RTCtime);
+  M5.rtc.GetDate(&RTCDate);
+  CurrentHour = RTCtime.Hours;
+  CurrentMin  = RTCtime.Minutes;
+  CurrentSec  = RTCtime.Seconds;  
+
+  
+  sprintf(timeStrbuff,"M5 RTC %d/%02d/%02d %02d:%02d:%02d",
+                      RTCDate.Year,RTCDate.Month,RTCDate.Date,
+                      RTCtime.Hours,RTCtime.Minutes,RTCtime.Seconds);
+                      
+  Serial.printf(timeStrbuff);
+                                 
+}
+
 boolean UpdateLocalTime() {
   struct tm timeinfo;
   char output[30], day_output[30];
@@ -302,6 +317,17 @@ boolean UpdateLocalTime() {
   CurrentHour = timeinfo.tm_hour;
   CurrentMin  = timeinfo.tm_min;
   CurrentSec  = timeinfo.tm_sec;
+  
+  RTCtime.Hours = timeinfo.tm_hour;
+  RTCtime.Minutes = timeinfo.tm_min;
+  RTCtime.Seconds = timeinfo.tm_sec;
+  M5.rtc.SetTime(&RTCtime);
+  
+  RTCDate.Year = timeinfo.tm_year + 1900;
+  RTCDate.Month = timeinfo.tm_mon + 1;
+  RTCDate.Date = timeinfo.tm_mday;
+  M5.rtc.SetDate(&RTCDate);
+  
   //See http://www.cplusplus.com/reference/ctime/strftime/
   //Serial.println(&timeinfo, "%a %b %d %Y   %H:%M:%S"); // Displays: Saturday, June 24 2017 14:05:49
   Serial.println(&timeinfo, "%H:%M:%S");                 // Displays: 14:05:49
@@ -573,16 +599,15 @@ void DisplayWxPerson(int x, int y, String IconName) {
 }
 
 void InitialiseDisplay() {
-  display.init(115200, true, 2, false);
-  //// display.init(); for older Waveshare HAT's
-  SPI.end();
-  SPI.begin(EPD_SCK, EPD_MISO, EPD_MOSI, EPD_CS);
-  display.setRotation(3);
+  display.init(115200, true, 2000, false);
+  display.setRotation(0);
   display.setTextSize(0);
   display.setFont(&DejaVu_Sans_Bold_11);
   display.setTextColor(GxEPD_BLACK);
   display.fillScreen(GxEPD_WHITE);
   display.setFullWindow();
+  display.clearScreen(0xFF);
+  delay(500);
 }
 
 /*
