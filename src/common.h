@@ -129,6 +129,34 @@ bool DecodeWeather(WiFiClient& json, String Type) {
     if (Units == "I") Convert_Readings_to_Imperial();
     if (Units == "R") Convert_Readings_to_Russian();
   }
+  
+  if (Type == "currentconditions") // accuweather
+  {
+    // All Serial.println statements are for diagnostic purposes and some are not required, remove if not needed with //
+    WxConditions[0].High        = -50; // Minimum forecast low
+    WxConditions[0].Low         = 50;  // Maximum Forecast High
+    // WxConditions[0].Timezone   = doc["timezone_offset"]; // "0"
+    // JsonObject current = doc["current"];
+    // WxConditions[0].Sunrise     = current["sunrise"];                              Serial.println("SRis: " + String(WxConditions[0].Sunrise));
+    // WxConditions[0].Sunset      = current["sunset"];                               Serial.println("SSet: " + String(WxConditions[0].Sunset));
+    WxConditions[0].Temperature = root["Temperature"]["Metric"]["Value"];                                 Serial.println("Temp: " + String(WxConditions[0].Temperature));
+    WxConditions[0].Feelslike   = root["RealFeelTemperature"]["Metric"]["Value"];                           Serial.println("FLik: " + String(WxConditions[0].Feelslike));
+    WxConditions[0].Pressure    = root["Pressure"]["Metric"]["Value"];                             Serial.println("Pres: " + String(WxConditions[0].Pressure));
+    WxConditions[0].PressureTendency = root["PressureTendency"]["LocalizedText"].as<char*>();
+    WxConditions[0].Humidity    = root["RelativeHumidity"];                             Serial.println("Humi: " + String(WxConditions[0].Humidity));
+    WxConditions[0].DewPoint    = root["DewPoint"]["Metric"]["Value"];                            Serial.println("DPoi: " + String(WxConditions[0].DewPoint));
+    WxConditions[0].UVI         = root["UVIndex"];                                  Serial.println("UVin: " + String(WxConditions[0].UVI));
+    WxConditions[0].UVIText     = root["UVIndexText"].as<char*>();
+    WxConditions[0].Cloudcover  = root["CloudCover"];                               Serial.println("CCov: " + String(WxConditions[0].Cloudcover));
+    WxConditions[0].Visibility  = root["Visibility"]["Metric"]["Value"];                           Serial.println("Visi: " + String(WxConditions[0].Visibility));
+    WxConditions[0].Windspeed   = root["Wind"]["Speed"]["Metric"]["Value"];                           Serial.println("WSpd: " + String(WxConditions[0].Windspeed));
+    WxConditions[0].Winddir     = root["Wind"]["Direction"]["Degrees"];                             Serial.println("WDir: " + String(WxConditions[0].Winddir));
+    String Description = root["WeatherText"];                                         // "scattered clouds"
+    String Icon        = String("aw") + root["WeatherIcon"].as<char*>();                                   // "01n"
+    WxConditions[0].Forecast0   = Description;                                     Serial.println("Fore: " + String(WxConditions[0].Forecast0));
+    WxConditions[0].Icon        = Icon;                                            Serial.println("Icon: " + String(WxConditions[0].Icon));
+  }
+  
   return true;
 }
 //#########################################################################################
@@ -147,6 +175,32 @@ String ConvertUnixTime(int unix_time) {
 }
 //#########################################################################################
 //WiFiClient client; // wifi client object
+
+bool obtain_wx_data_accuweather(WiFiClient& client, const String& RequestType) 
+{
+  client.stop(); // close connection before sending a new request
+  HTTPClient http;
+
+  String uri = String("/") + RequestType + "/v1/" + accuLocation + "?apikey=" + accukey + "&details=true";
+
+  http.begin(client, accuServer, 80, uri);
+  int httpCode = http.GET();
+  if(httpCode == HTTP_CODE_OK) {
+    if (!DecodeWeather(http.getStream(), RequestType)) return false;
+    client.stop();
+    http.end();
+    return true;
+  }
+  else
+  {
+    Serial.printf("connection failed, error: %s", http.errorToString(httpCode).c_str());
+    client.stop();
+    http.end();
+    return false;
+  }
+  http.end();
+  return true;
+}
 
 bool obtain_wx_data(WiFiClient& client, const String& RequestType) {
   const String units = (Units == "I" ? "imperial" : "metric");
