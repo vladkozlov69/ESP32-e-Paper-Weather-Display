@@ -90,6 +90,7 @@ char climacell_openw_translations[][3][20] = {
 };
 
 void decodeClimacellInterval(Forecast_record_type * forecast, JsonObject values);
+void decodeClimacellPrecipitation(Forecast_record_type * forecast, JsonArray intervals, int position, int count);
 int climacellToUnixTime(const char * climacellTime);
 
 String climacell_weather_decode(const char * code, const int index)
@@ -124,8 +125,6 @@ void Convert_Readings_to_Imperial() {
 
 void Convert_Readings_to_Russian() { // Only the first 3-hours are used
   WxConditions[0].Pressure = hPa_to_mmHg(WxConditions[0].Pressure);
-  // WxForecast[0].Rainfall   = mm_to_inches(WxForecast[0].Rainfall);
-  // WxForecast[0].Snowfall   = mm_to_inches(WxForecast[0].Snowfall);
 }
 
 //#########################################################################################
@@ -243,12 +242,6 @@ bool DecodeWeather(WiFiClient& json, String Type) {
     JsonArray rootArray = doc.as<JsonArray>();
     JsonObject root = rootArray.getElement(0);
     // All Serial.println statements are for diagnostic purposes and some are not required, remove if not needed with //
-    WxConditions[0].High        = -50; // Minimum forecast low
-    WxConditions[0].Low         = 50;  // Maximum Forecast High
-    // WxConditions[0].Timezone   = doc["timezone_offset"]; // "0"
-    // JsonObject current = doc["current"];
-    // WxConditions[0].Sunrise     = current["sunrise"];                              Serial.println("SRis: " + String(WxConditions[0].Sunrise));
-    // WxConditions[0].Sunset      = current["sunset"];                               Serial.println("SSet: " + String(WxConditions[0].Sunset));
     WxConditions[0].Temperature      = root["Temperature"]["Metric"]["Value"];                 Serial.println("Temp: " + String(WxConditions[0].Temperature));
     WxConditions[0].Feelslike        = root["RealFeelTemperature"]["Metric"]["Value"];         Serial.println("FLik: " + String(WxConditions[0].Feelslike)); 
     WxConditions[0].Pressure         = root["Pressure"]["Metric"]["Value"];                    Serial.println("Pres: " + String(WxConditions[0].Pressure));
@@ -271,6 +264,9 @@ bool DecodeWeather(WiFiClient& json, String Type) {
       String Icon = String(accu_openw_icon_translations[IconIndex]) + (IsDayTime ? "d" : "n");
       WxConditions[0].Icon           = Icon;                                                   Serial.println("Icon: " + String(WxConditions[0].Icon));
     }
+
+    WxConditions[0].Visibility = WxConditions[0].Visibility * 1000;
+    WxConditions[0].Pressure = hPa_to_mmHg(WxConditions[0].Pressure);
   }
 
   if (Type == "current,1h") // climacell
@@ -291,6 +287,7 @@ bool DecodeWeather(WiFiClient& json, String Type) {
     {
       Serial.println("--------------");
       decodeClimacellInterval(&(WxForecast[r]), forecastIntervals.getElement(r * 3 + 2));
+      decodeClimacellPrecipitation(&(WxForecast[r]), forecastIntervals, r * 3, 3);
 
       if (r < 8) { // Check next 3 x 8 Hours = 1 day
         if (WxForecast[r].High > WxConditions[0].High) WxConditions[0].High = WxForecast[r].High; // Get Highest temperature for next 24Hrs
@@ -337,6 +334,9 @@ void decodeClimacellInterval(Forecast_record_type * forecast, JsonObject interva
     forecast->UVI              = interval["values"]["uvIndex"];                     Serial.println("UVin: " + String(forecast->UVI));
     forecast->Cloudcover       = interval["values"]["cloudCover"];                  Serial.println("CCov: " + String(forecast->Cloudcover));
     forecast->Visibility       = interval["values"]["visibility"];                  Serial.println("Visi: " + String(forecast->Visibility));
+    
+    forecast->Visibility = forecast->Visibility * 1000;
+    
     forecast->Windspeed        = interval["values"]["windSpeed"];                   Serial.println("WSpd: " + String(forecast->Windspeed));
     forecast->Winddir          = interval["values"]["windDirection"];               Serial.println("WDir: " + String(forecast->Winddir));
     int WeatherCode            = interval["values"]["weatherCode"];                 Serial.println("WCod: " + String(WeatherCode));
@@ -347,6 +347,32 @@ void decodeClimacellInterval(Forecast_record_type * forecast, JsonObject interva
     }
     forecast->High = forecast->Low = forecast->Temperature;
     forecast->Dt = climacellToUnixTime(forecast->Period.c_str());                 Serial.println("Dt  : " + String(forecast->Dt));
+}
+
+void decodeClimacellPrecipitation(Forecast_record_type * forecast, JsonArray intervals, int position, int count)
+{
+    for (int i = 0; i < intervals; i++)
+    {
+      JsonObject interval = intervals.getElement(position + i);
+      /*
+        precipitationType:
+        0: N/A
+        1: Rain
+        2: Snow
+        3: Freezing Rain
+        4: Ice Pellets
+      */
+      int precipitationType = interval["values"]["precipitationType"];
+      float precipitationIntensity = interval["values"]["precipitationIntensity"];
+      if (precipitationType == 2 || precipitationType == 4)
+      {
+        forecast->Snowfall += precipitationIntensity;                                 Serial.println("Snow: " + String(precipitationIntensity));
+      }
+      else
+      {
+        forecast->Rainfall += precipitationIntensity;                                 Serial.println("Rain: " + String(precipitationIntensity));
+      }
+    }
 }
 
 int climacellToUnixTime(const char * climacellTime)
@@ -405,14 +431,14 @@ bool obtain_wx_data_accuweather(WiFiClient& client, const String& RequestType)
   return true;
 }
 
-bool obtain_wx_data_climacell(WiFiClientSecure& client, const String& RequestType, tm * p_current_time)
+bool obtain_wx_data_climacell(WiFiClientSecure& client, const String& RequestType, tm * p_current_time, int hours_to_fetch)
 {
   client.stop(); // close connection before sending a new request
   HTTPClient http;
 
   time_t rawtime = mktime(p_current_time);
   struct tm * endTime = localtime(&rawtime);
-  endTime->tm_hour = endTime->tm_hour + 48;
+  endTime->tm_hour = endTime->tm_hour + hours_to_fetch;
   mktime(endTime);
 
 // "2019-03-20T14:09:50Z"
@@ -452,7 +478,7 @@ bool obtain_wx_data_climacell(WiFiClientSecure& client, const String& RequestTyp
 }
 
 
-bool obtain_wx_data(WiFiClient& client, const String& RequestType) {
+bool obtain_wx_data_owm(WiFiClient& client, const String& RequestType) {
   const String units = (Units == "I" ? "imperial" : "metric");
   client.stop(); // close connection before sending a new request
   HTTPClient http;
