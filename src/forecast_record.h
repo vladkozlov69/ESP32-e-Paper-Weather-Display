@@ -29,12 +29,14 @@ typedef struct { // For current Day and Day 1, 2, 3, etc
   float    Snowfall;
   float    Pop;
   float    Pressure;
+  String   PressureTendency;
   int      Cloudcover;
   int      Visibility;
   int      Sunrise;
   int      Sunset;
   int      Timezone;
   float    UVI;
+  String   UVIText;
 } Forecast_record_type;
 
 #endif /* ifndef FORECAST_RECORD_H_ */
