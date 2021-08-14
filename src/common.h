@@ -405,12 +405,13 @@ String ConvertUnixTime(int unix_time) {
 //#########################################################################################
 //WiFiClient client; // wifi client object
 
-bool obtain_wx_data_accuweather(WiFiClient& client, const String& RequestType) 
+bool obtain_wx_data_accuweather(WiFiClient& client, const String& RequestType, 
+      const String& accuLocation, const String& accuKey) 
 {
   client.stop(); // close connection before sending a new request
   HTTPClient http;
 
-  String uri = String("/") + RequestType + "/v1/" + accuLocation + "?apikey=" + accukey + "&details=true";
+  String uri = String("/") + RequestType + "/v1/" + accuLocation + "?apikey=" + accuKey + "&details=true";
 
   http.begin(client, accuServer, 80, uri);
   int httpCode = http.GET();
@@ -431,7 +432,9 @@ bool obtain_wx_data_accuweather(WiFiClient& client, const String& RequestType)
   return true;
 }
 
-bool obtain_wx_data_climacell(WiFiClientSecure& client, const String& RequestType, tm * p_current_time, int hours_to_fetch)
+bool obtain_wx_data_climacell(WiFiClientSecure& client, const String& RequestType, 
+    tm * p_current_time, int hours_to_fetch, 
+    const String& climacellKey, const String& latitude, const String& longitude, const String& climacellTimezone)
 {
   client.stop(); // close connection before sending a new request
   HTTPClient http;
@@ -446,7 +449,7 @@ bool obtain_wx_data_climacell(WiFiClientSecure& client, const String& RequestTyp
   strftime(endTimeStr, sizeof(endTimeStr), "%Y-%m-%dT%H:%M:%SZ", endTime);
 
   String uri = String("/v4/timelines?apikey=") + climacellKey + 
-    "&location=" + Latitude + "," + Longitude + 
+    "&location=" + latitude + "," + longitude + 
     "&fields=" + (RequestType == "1d" ? climacellFieldsAstro : climacellFieldsWeather) + 
     "&endTime=" + endTimeStr +
     "&timesteps=" + RequestType +
@@ -478,13 +481,14 @@ bool obtain_wx_data_climacell(WiFiClientSecure& client, const String& RequestTyp
 }
 
 
-bool obtain_wx_data_owm(WiFiClient& client, const String& RequestType) {
+bool obtain_wx_data_owm(WiFiClient& client, const String& RequestType, 
+    const String& Latitude, const String& Longitude, const String apiKey) {
   const String units = (Units == "I" ? "imperial" : "metric");
   client.stop(); // close connection before sending a new request
   HTTPClient http;
   //api.openweathermap.org/data/2.5/RequestType?lat={lat}&lon={lon}&appid={API key}
   //String uri = "/data/2.5/" + RequestType + "?q=" + City + "," + Country + "&APPID=" + apikey + "&mode=json&units=" + units + "&lang=" + Language;
-  String uri = "/data/2.5/" + RequestType + "?lat=" + Latitude + "&lon=" + Longitude + "&appid=" + apikey + "&mode=json&units=" + units + "&lang=" + Language;
+  String uri = "/data/2.5/" + RequestType + "?lat=" + Latitude + "&lon=" + Longitude + "&appid=" + apiKey + "&mode=json&units=" + units + "&lang=" + Language;
   if (RequestType == "onecall") uri += "&exclude=minutely,hourly,alerts,daily";
   if(RequestType != "weather")
   {
