@@ -130,9 +130,17 @@ void Convert_Readings_to_Russian() { // Only the first 3-hours are used
 //#########################################################################################
 // Problems with stucturing JSON decodes, see here: https://arduinojson.org/assistant/
 bool DecodeWeather(WiFiClient& json, String Type) {
-  Serial.print(F("\nCreating object...and "));
+  Serial.print(F("\nCreating object... "));
+
+  Serial.print(F("ESP.getFreeHeap() = "));
+  Serial.println(ESP.getFreeHeap());
+  Serial.print(F("ESP.getMaxAllocHeap() = "));
+  Serial.println(ESP.getMaxAllocHeap());
   // allocate the JsonDocument
-  DynamicJsonDocument doc(35 * 1024);
+  DynamicJsonDocument doc(min((unsigned int)(35 * 1024), ESP.getMaxAllocHeap() - 5000));
+  //StaticJsonDocument<35 * 1024> doc;
+  Serial.print(F("DynamicJsonDocument capacity = "));
+  Serial.println(doc.capacity());
   // Deserialize the JSON document
   DeserializationError error = deserializeJson(doc, json);
   // Test if parsing succeeds.
@@ -238,7 +246,7 @@ bool DecodeWeather(WiFiClient& json, String Type) {
   
   if (Type == "currentconditions") // accuweather
   {
-    Serial.println("Decoding: currentconditions");
+    Serial.println(F("Decoding: currentconditions (accuweather)"));
     JsonArray rootArray = doc.as<JsonArray>();
     JsonObject root = rootArray.getElement(0);
     // All Serial.println statements are for diagnostic purposes and some are not required, remove if not needed with //
@@ -271,7 +279,7 @@ bool DecodeWeather(WiFiClient& json, String Type) {
 
   if (Type == "current,1h") // climacell
   {
-    Serial.println("Decoding: climacell current,1h");
+    Serial.println(F("Decoding: climacell current,1h"));
 
     JsonArray timelines = root["data"]["timelines"];
     JsonObject currentStep = timelines.getElement(0);
@@ -309,7 +317,7 @@ bool DecodeWeather(WiFiClient& json, String Type) {
 
   if (Type == "1d") // climacell
   {
-    Serial.println("Decoding: climacell 1d");
+    Serial.println(F("Decoding: climacell 1d"));
 
     JsonArray timelines = root["data"]["timelines"];
     JsonObject currentStep = timelines.getElement(0);
