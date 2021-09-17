@@ -42,7 +42,7 @@ void NetworkManager::begin()
     wm->addParameter(&wmp_long);
     wm->addParameter(&wmp_iana_tz);
 
-    wm->setTryConnectDuringConfigPortal(false);
+    wm->setTryConnectDuringConfigPortal(true);
 
     if(wm->startConfigPortal("ConfigPortalAP"))
     {
