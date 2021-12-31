@@ -8,9 +8,9 @@
 #include "forecast_record.h"
 #include "common_functions.h"
 
-char      *_EXFUN(strptime,     (const char *__restrict,
-				 const char *__restrict,
-				 struct tm *__restrict));
+// char      *_EXFUN(strptime,     (const char *__restrict,
+// 				 const char *__restrict,
+// 				 struct tm *__restrict));
 
 char accu_openw_icon_translations[][3] = {
 /* 0 */ "nd",
