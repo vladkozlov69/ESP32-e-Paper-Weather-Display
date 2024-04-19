@@ -224,8 +224,8 @@ bool DecodeWeather(WiFiClient& json, String Type) {
       WxForecast[r].Pop               = hourly[hr]["pop"].as<float>();                       Serial.println("Pop:  "+String(WxForecast[r].Pop));
       WxForecast[r].Period            = "dt_txt";                   Serial.println("Peri: "+String(WxForecast[r].Period));
       if (r < 8) { // Check next 3 x 8 Hours = 1 day
-        if (WxForecast[r].High > WxConditions[0].High) WxConditions[0].High = WxForecast[r].High; // Get Highest temperature for next 24Hrs
-        if (WxForecast[r].Low  < WxConditions[0].Low)  WxConditions[0].Low  = WxForecast[r].Low;  // Get Lowest  temperature for next 24Hrs
+        if (WxForecast[r].Temperature > WxConditions[0].High) WxConditions[0].High = WxForecast[r].High; // Get Highest temperature for next 24Hrs
+        if (WxForecast[r].Temperature  < WxConditions[0].Low)  WxConditions[0].Low  = WxForecast[r].Low;  // Get Lowest  temperature for next 24Hrs
       }
     }
 
