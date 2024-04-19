@@ -203,6 +203,46 @@ bool DecodeWeather(WiFiClient& json, String Type) {
     WxConditions[0].Icon        = Icon;                                            Serial.println("Icon: " + String(WxConditions[0].Icon));
   }
 
+  if (Type == "onecall") { // 3.0
+    Serial.print(F("\nReceiving Onecall 3.0 Forecast")); 
+    //------------------------------------------------
+    JsonArray hourly                  = root["hourly"];
+    int readings_3hr = hourly.size() / 3 - 1;
+    for (byte r = 0; r < min(readings_3hr, max_readings); r++) {
+      int hr = r * 3; // 3-hour intervals
+      Serial.println("\nPeriod-" + String(r) + "--------------");
+      WxForecast[r].Dt                = hourly[hr]["dt"].as<int>();                          Serial.println("DTim: "+String(WxForecast[r].Dt));
+      WxForecast[r].Visibility        = hourly[hr]["clouds"].as<int>(); Serial.println("Visi: "+String(WxForecast[r].Visibility));
+      WxForecast[r].Temperature       = hourly[hr]["temp"].as<float>();              Serial.println("Temp: "+String(WxForecast[r].Temperature));
+      WxForecast[r].Feelslike         = hourly[hr]["feels_like"].as<float>();              Serial.println("FLik: "+String(WxForecast[r].Feelslike));
+      WxForecast[r].Pressure          = hourly[hr]["pressure"].as<float>();                  Serial.println("Pres: "+String(WxForecast[r].Pressure));
+      WxForecast[r].Humidity          = hourly[hr]["humidity"].as<float>();                  Serial.println("Humi: "+String(WxForecast[r].Humidity));
+      WxForecast[r].Icon              = hourly[hr]["weather"][0]["icon"].as<char*>();        Serial.println("Icon: "+String(WxForecast[r].Icon));
+      WxForecast[r].Description       = hourly[hr]["weather"][0]["description"].as<char*>(); Serial.println("Desc: "+String(WxForecast[r].Description));
+      WxForecast[r].Cloudcover        = hourly[hr]["clouds"].as<int>();                      Serial.println("CCov: "+String(WxForecast[r].Cloudcover)); // in % of cloud cover
+      WxForecast[r].Windspeed         = hourly[hr]["wind_speed"].as<float>();                Serial.println("WSpd: "+String(WxForecast[r].Windspeed));
+      WxForecast[r].Winddir           = hourly[hr]["wind_deg"].as<float>();               Serial.println("WDir: "+String(WxForecast[r].Winddir));
+      // WxForecast[r].Rainfall          = list[r]["rain"]["3h"].as<float>();                Serial.println("Rain: "+String(WxForecast[r].Rainfall));
+      // WxForecast[r].Snowfall          = list[r]["snow"]["3h"].as<float>();                Serial.println("Snow: "+String(WxForecast[r].Snowfall));
+      WxForecast[r].Pop               = hourly[hr]["pop"].as<float>();                       Serial.println("Pop:  "+String(WxForecast[r].Pop));
+      WxForecast[r].Period            = "dt_txt";                   Serial.println("Peri: "+String(WxForecast[r].Period));
+      if (r < 8) { // Check next 3 x 8 Hours = 1 day
+        if (WxForecast[r].High > WxConditions[0].High) WxConditions[0].High = WxForecast[r].High; // Get Highest temperature for next 24Hrs
+        if (WxForecast[r].Low  < WxConditions[0].Low)  WxConditions[0].Low  = WxForecast[r].Low;  // Get Lowest  temperature for next 24Hrs
+      }
+    }
+    //------------------------------------------
+    float pressure_trend = WxForecast[0].Pressure - WxForecast[2].Pressure; // Measure pressure slope between ~now and later
+    pressure_trend = ((int)(pressure_trend * 10)) / 10.0; // Remove any small variations less than 0.1
+    WxConditions[0].Trend = "0";
+    if (pressure_trend > 0)  WxConditions[0].Trend = "+";
+    if (pressure_trend < 0)  WxConditions[0].Trend = "-";
+    if (pressure_trend == 0) WxConditions[0].Trend = "0";
+
+    if (Units == "I") Convert_Readings_to_Imperial();
+    if (Units == "R") Convert_Readings_to_Russian();
+  }
+
   if (Type == "forecast") {
     //Serial.println(json);
     Serial.print(F("\nReceiving Forecast period - ")); //------------------------------------------------
@@ -231,6 +271,10 @@ bool DecodeWeather(WiFiClient& json, String Type) {
         if (WxForecast[r].High > WxConditions[0].High) WxConditions[0].High = WxForecast[r].High; // Get Highest temperature for next 24Hrs
         if (WxForecast[r].Low  < WxConditions[0].Low)  WxConditions[0].Low  = WxForecast[r].Low;  // Get Lowest  temperature for next 24Hrs
       }
+    }
+    for (byte r = 0; r < min(8, max_readings); r++) {
+      if (WxForecast[r].Temperature > WxConditions[0].High) WxConditions[0].High = WxForecast[r].Temperature;
+      if (WxForecast[r].Temperature < WxConditions[0].Low) WxConditions[0].Low = WxForecast[r].Temperature;
     }
     //------------------------------------------
     float pressure_trend = WxForecast[0].Pressure - WxForecast[2].Pressure; // Measure pressure slope between ~now and later
@@ -494,10 +538,10 @@ bool obtain_wx_data_owm(WiFiClient& client, const String& RequestType,
   const String units = (Units == "I" ? "imperial" : "metric");
   client.stop(); // close connection before sending a new request
   HTTPClient http;
-  //api.openweathermap.org/data/2.5/RequestType?lat={lat}&lon={lon}&appid={API key}
-  //String uri = "/data/2.5/" + RequestType + "?q=" + City + "," + Country + "&APPID=" + apikey + "&mode=json&units=" + units + "&lang=" + Language;
-  String uri = "/data/2.5/" + RequestType + "?lat=" + Latitude + "&lon=" + Longitude + "&appid=" + apiKey + "&mode=json&units=" + units + "&lang=" + Language;
-  if (RequestType == "onecall") uri += "&exclude=minutely,hourly,alerts,daily";
+  //api.openweathermap.org/data/3.0/RequestType?lat={lat}&lon={lon}&appid={API key}
+  //String uri = "/data/3.0/" + RequestType + "?q=" + City + "," + Country + "&APPID=" + apikey + "&mode=json&units=" + units + "&lang=" + Language;
+  String uri = "/data/3.0/" + RequestType + "?lat=" + Latitude + "&lon=" + Longitude + "&appid=" + apiKey + "&mode=json&units=" + units + "&lang=" + Language;
+  if (RequestType == "onecall") uri += "&exclude=minutely,alerts";
   if(RequestType != "weather")
   {
     uri += "&cnt=" + String(max_readings);
