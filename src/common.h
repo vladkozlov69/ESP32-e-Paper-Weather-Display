@@ -60,7 +60,7 @@ char accu_openw_icon_translations[][3] = {
 /* 44	Mostly Cloudy w/ Snow */  "13"
 };
 
-char climacell_openw_translations[][3][20] = {
+char tomorrow_io_openw_translations[][3][20] = {
   {"1000", "01d", "Clear"},
   {"1001", "03d", "Cloudy"},
   {"1100", "02d", "Mostly Clear"},
@@ -89,31 +89,31 @@ char climacell_openw_translations[][3][20] = {
   {"8000", "11d", "Thunderstorm"}
 };
 
-// void decodeClimacellInterval(Forecast_record_type * forecast, JsonObject values);
-// void decodeClimacellPrecipitation(Forecast_record_type * forecast, JsonArray intervals, int position, int count);
-// int climacellToUnixTime(const char * climacellTime);
+void decodeTomorrowIoInterval(Forecast_record_type * forecast, JsonObject values);
+void decodeTomorrowIoPrecipitation(Forecast_record_type * forecast, JsonArray intervals, int position, int count);
+int tomorrowIoToUnixTime(const char * tomorrowIo_Time);
 
-String climacell_weather_decode(const char * code, const int index)
+String tomorrow_io_weather_decode(const char * code, const int index)
 {
   for (int i = 0; i <=25; i++)
   {
-    if (strcmp(code, climacell_openw_translations[i][0]) == 0)
+    if (strcmp(code, tomorrow_io_openw_translations[i][0]) == 0)
     {
-      return climacell_openw_translations[i][index];
+      return tomorrow_io_openw_translations[i][index];
     }
   }
 
   return "N/A";
 }
 
-String climacell_weather_icon(const char * code)
+String tomorrow_io_weather_icon(const char * code)
 {
-  return climacell_weather_decode(code, 1);
+  return tomorrow_io_weather_decode(code, 1);
 }
 
-String climacell_weather_text(const char * code)
+String tomorrow_io_weather_text(const char * code)
 {
-  return climacell_weather_decode(code, 2);
+  return tomorrow_io_weather_decode(code, 2);
 }
 
 //#########################################################################################
@@ -231,26 +231,33 @@ bool DecodeWeather(WiFiClient& json, String Type) {
 
     JsonArray daily                  = root["daily"];
     
-    for (byte r = 0; r < min(daily.size(), (size_t)(max_daily_readings / 4)); r++) {
+    size_t daily_readings_count = min(daily.size(), (size_t)max_readings);
+    pressure_readings_count = daily_readings_count;
+    temperature_readings_count = daily_readings_count * 4;
+    humidity_readings_count = daily_readings_count;
+    rain_readings_count = daily_readings_count;
+    snow_readings_count = daily_readings_count;
+    for (byte r = 0; r < daily_readings_count; r++) {
       Serial.println("\nDaily Period-" + String(r) + "--------------");
-      for (byte i = 0; i < 4; i++) {
-        WxDailyForecast[r * 4 + i].Dt       = daily[r]["dt"].as<int>();
-        WxDailyForecast[r * 4 + i].Pressure = daily[r]["pressure"].as<float>();
-        WxDailyForecast[r * 4 + i].Humidity = daily[r]["humidity"].as<float>();
-        WxDailyForecast[r * 4 + i].Rainfall = daily[r]["rain"].as<float>();
-      }
-      WxDailyForecast[r * 4 + 0].Temperature = daily[r]["temp"]["morn"].as<int>();
-      WxDailyForecast[r * 4 + 1].Temperature = daily[r]["temp"]["day"].as<int>();
-      WxDailyForecast[r * 4 + 2].Temperature = daily[r]["temp"]["eve"].as<int>();
-      WxDailyForecast[r * 4 + 3].Temperature = daily[r]["temp"]["night"].as<int>();
-      Serial.println("DTim: "+String(WxDailyForecast[r * 4 + 0].Dt));
-      Serial.println("Pres: "+String(WxDailyForecast[r * 4 + 0].Pressure));
-      Serial.println("Humi: "+String(WxDailyForecast[r * 4 + 0].Humidity));
-      Serial.println("Rain: "+String(WxDailyForecast[r * 4 + 0].Rainfall));
-      Serial.println("Tem1: "+String(WxDailyForecast[r * 4 + 0].Temperature));
-      Serial.println("Tem2: "+String(WxDailyForecast[r * 4 + 1].Temperature));
-      Serial.println("Tem3: "+String(WxDailyForecast[r * 4 + 2].Temperature));
-      Serial.println("Tem4: "+String(WxDailyForecast[r * 4 + 3].Temperature));
+      if (Units == "I") pressure_readings[r] = daily[r]["pressure"].as<float>() * 0.02953;   else pressure_readings[r] = daily[r]["pressure"].as<float>();
+      if (Units == "R") pressure_readings[r] = daily[r]["pressure"].as<float>() * 0.75006;   else pressure_readings[r] = daily[r]["pressure"].as<float>();
+
+      if (Units == "I") rain_readings[r] = daily[r]["rain"].as<float>() * 0.02953;   else rain_readings[r] = daily[r]["rain"].as<float>();
+      if (Units == "I") snow_readings[r] = daily[r]["snow"].as<float>() * 0.02953;   else snow_readings[r] = daily[r]["snow"].as<float>();
+      humidity_readings[r] = daily[r]["humidity"].as<float>();
+      temperature_readings[r * 4 + 0] = daily[r]["temp"]["morn"].as<int>();
+      temperature_readings[r * 4 + 1] = daily[r]["temp"]["day"].as<int>();
+      temperature_readings[r * 4 + 2] = daily[r]["temp"]["eve"].as<int>();
+      temperature_readings[r * 4 + 3] = daily[r]["temp"]["night"].as<int>();
+
+      Serial.println("Pres: "+String(pressure_readings[r]));
+      Serial.println("Humi: "+String(humidity_readings[r]));
+      Serial.println("Rain: "+String(rain_readings[r]));
+      Serial.println("Snow: "+String(snow_readings[r]));
+      Serial.println("Tem1: "+String(temperature_readings[r * 4 + 0]));
+      Serial.println("Tem2: "+String(temperature_readings[r * 4 + 1]));
+      Serial.println("Tem3: "+String(temperature_readings[r * 4 + 2]));
+      Serial.println("Tem4: "+String(temperature_readings[r * 4 + 3]));
     }
     //------------------------------------------
     float pressure_trend = WxForecast[0].Pressure - WxForecast[2].Pressure; // Measure pressure slope between ~now and later
@@ -343,26 +350,26 @@ bool DecodeWeather(WiFiClient& json, String Type) {
     WxConditions[0].Pressure = hPa_to_mmHg(WxConditions[0].Pressure);
   }
 */
-/*
-  if (Type == "current,1h") // climacell
+
+  if (Type == "current,1h") // tomorrowIo
   {
-    Serial.println(F("Decoding: climacell current,1h"));
+    Serial.println(F("Decoding: tomorrowIo current,1h"));
 
     JsonArray timelines = root["data"]["timelines"];
-    JsonObject currentStep = timelines.getElement(0);
-    JsonObject forecastStep = timelines.getElement(1);
+    JsonObject currentStep = timelines[0];
+    JsonObject forecastStep = timelines[1];
     JsonArray currentIntervals = currentStep["intervals"];
     JsonArray forecastIntervals = forecastStep["intervals"];
 
     WxConditions[0].High        = -50; // Minimum forecast low
     WxConditions[0].Low         = 50;  // Maximum Forecast High
-    decodeClimacellInterval(&(WxConditions[0]), currentIntervals.getElement(0));
+    decodeTomorrowIoInterval(&(WxConditions[0]), currentIntervals[0]);
 
     for (byte r = 0; r < max_readings; r++) 
     {
       Serial.println("--------------");
-      decodeClimacellInterval(&(WxForecast[r]), forecastIntervals.getElement(r * 3 + 2));
-      decodeClimacellPrecipitation(&(WxForecast[r]), forecastIntervals, r * 3, 3);
+      decodeTomorrowIoInterval(&(WxForecast[r]), forecastIntervals[r * 3 + 2]);
+      decodeTomorrowIoPrecipitation(&(WxForecast[r]), forecastIntervals, r * 3, 3);
 
       if (r < 8) { // Check next 3 x 8 Hours = 1 day
         if (WxForecast[r].High > WxConditions[0].High) WxConditions[0].High = WxForecast[r].High; // Get Highest temperature for next 24Hrs
@@ -381,27 +388,27 @@ bool DecodeWeather(WiFiClient& json, String Type) {
     if (Units == "I") Convert_Readings_to_Imperial();
     if (Units == "R") Convert_Readings_to_Russian();
   }
-*/
-/*
-  if (Type == "1d") // climacell
+
+
+  if (Type == "1d") // tomorrowIo
   {
-    Serial.println(F("Decoding: climacell 1d"));
+    Serial.println(F("Decoding: tomorrowIo 1d"));
 
     JsonArray timelines = root["data"]["timelines"];
-    JsonObject currentStep = timelines.getElement(0);
+    JsonObject currentStep = timelines[0];
     JsonArray currentIntervals = currentStep["intervals"];
-    JsonObject current = currentIntervals.getElement(0);
+    JsonObject current = currentIntervals[0];
   
-    WxConditions[0].Sunrise     = climacellToUnixTime(current["values"]["sunriseTime"].as<char*>()); Serial.println("SRis: "+String(WxConditions[0].Sunrise));
-    WxConditions[0].Sunset      = climacellToUnixTime(current["values"]["sunsetTime"].as<char*>());  Serial.println("SSet: "+String(WxConditions[0].Sunset));
+    WxConditions[0].Sunrise     = tomorrowIoToUnixTime(current["values"]["sunriseTime"].as<String>().c_str()); Serial.println("SRis: "+String(WxConditions[0].Sunrise));
+    WxConditions[0].Sunset      = tomorrowIoToUnixTime(current["values"]["sunsetTime"].as<String>().c_str());  Serial.println("SSet: "+String(WxConditions[0].Sunset));
   }
-*/
+
   return true;
 }
-/*
-void decodeClimacellInterval(Forecast_record_type * forecast, JsonObject interval)
+
+void decodeTomorrowIoInterval(Forecast_record_type * forecast, JsonObject interval)
 {
-    forecast->Period           = interval["startTime"].as<char*>();                 Serial.println("Peri: " + String(forecast->Period));
+    forecast->Period           = interval["startTime"].as<String>();                 Serial.println("Peri: " + String(forecast->Period));
     forecast->Temperature      = interval["values"]["temperature"];                 Serial.println("Temp: " + String(forecast->Temperature));
     forecast->Feelslike        = interval["values"]["temperatureApparent"];         Serial.println("FLik: " + String(forecast->Feelslike)); 
     forecast->Pressure         = interval["values"]["pressureSurfaceLevel"];        Serial.println("Pres: " + String(forecast->Pressure));
@@ -418,19 +425,19 @@ void decodeClimacellInterval(Forecast_record_type * forecast, JsonObject interva
     int WeatherCode            = interval["values"]["weatherCode"];                 Serial.println("WCod: " + String(WeatherCode));
     if (WeatherCode > 0)
     {
-      forecast->Forecast0 = climacell_weather_text(String(WeatherCode).c_str());  Serial.println("Fore: " + String(forecast->Forecast0));
-      forecast->Icon      = climacell_weather_icon(String(WeatherCode).c_str());  Serial.println("Icon: " + String(forecast->Icon));
+      forecast->Forecast0 = tomorrow_io_weather_text(String(WeatherCode).c_str());  Serial.println("Fore: " + String(forecast->Forecast0));
+      forecast->Icon      = tomorrow_io_weather_icon(String(WeatherCode).c_str());  Serial.println("Icon: " + String(forecast->Icon));
     }
     forecast->High = forecast->Low = forecast->Temperature;
-    forecast->Dt = climacellToUnixTime(forecast->Period.c_str());                 Serial.println("Dt  : " + String(forecast->Dt));
+    forecast->Dt = tomorrowIoToUnixTime(forecast->Period.c_str());                 Serial.println("Dt  : " + String(forecast->Dt));
 }
-*/
-/*
-void decodeClimacellPrecipitation(Forecast_record_type * forecast, JsonArray intervals, int position, int count)
+
+
+void decodeTomorrowIoPrecipitation(Forecast_record_type * forecast, JsonArray intervals, int position, int count)
 {
     for (int i = 0; i < intervals; i++)
     {
-      JsonObject interval = intervals.getElement(position + i);
+      JsonObject interval = intervals[position + i];
       
         // precipitationType:
         // 0: N/A
@@ -451,14 +458,14 @@ void decodeClimacellPrecipitation(Forecast_record_type * forecast, JsonArray int
       }
     }
 }
-*/
 
-int climacellToUnixTime(const char * climacellTime)
+
+int tomorrowIoToUnixTime(const char * tomorrowIoTime)
 {
     struct tm tm;
     time_t ts = 0;
     memset(&tm, 0, sizeof(tm));
-    strptime(climacellTime, "%Y-%m-%dT%H:%M:%S+%z:00", &tm);
+    strptime(tomorrowIoTime, "%Y-%m-%dT%H:%M:%S+%z:00", &tm);
     tm.tm_isdst = -1;
     Serial.println(tm.tm_hour);
     Serial.println(tm.tm_isdst);
@@ -510,9 +517,9 @@ bool obtain_wx_data_accuweather(WiFiClient& client, const String& RequestType,
   return true;
 }
 
-bool obtain_wx_data_climacell(WiFiClientSecure& client, const String& RequestType, 
+bool obtain_wx_data_tomorrowIo(WiFiClientSecure& client, const String& RequestType, 
     tm * p_current_time, int hours_to_fetch, 
-    const String& climacellKey, const String& latitude, const String& longitude, const String& climacellTimezone)
+    const String& tomorrowIoKey, const String& latitude, const String& longitude, const String& tomorrowIoTimezone)
 {
   client.stop(); // close connection before sending a new request
   HTTPClient http;
@@ -526,20 +533,20 @@ bool obtain_wx_data_climacell(WiFiClientSecure& client, const String& RequestTyp
   char endTimeStr[21];
   strftime(endTimeStr, sizeof(endTimeStr), "%Y-%m-%dT%H:%M:%SZ", endTime);
 
-  String uri = String("/v4/timelines?apikey=") + climacellKey + 
+  String uri = String("/v4/timelines?apikey=") + tomorrowIoKey + 
     "&location=" + latitude + "," + longitude + 
-    "&fields=" + (RequestType == "1d" ? climacellFieldsAstro : climacellFieldsWeather) + 
+    "&fields=" + (RequestType == "1d" ? tomorrowIoFieldsAstro : tomorrowIoFieldsWeather) + 
     "&endTime=" + endTimeStr +
     "&timesteps=" + RequestType +
-    "&units=metric&timezone=" + climacellTimezone;
+    "&units=metric&timezone=" + tomorrowIoTimezone;
 
   Serial.println(uri);
 
   client.setInsecure();
 
-  //http.begin(client, String(climacellServer) + uri);
+  //http.begin(client, String(tomorrowIo_Server) + uri);
   
-  http.begin(client, climacellServer, 443, uri, true);
+  http.begin(client, tomorrowIoServer, 443, uri, true);
   int httpCode = http.GET();
   if(httpCode == HTTP_CODE_OK) {
     if (!DecodeWeather(http.getStream(), RequestType)) return false;

@@ -16,7 +16,7 @@ typedef struct {
     String owm_key;
     String accu_key;
     String accu_loc;
-    String climacell_key;
+    String tomorrow_io_key;
     String latitude;
     String longitude;
     String iana_tz;
