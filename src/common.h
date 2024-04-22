@@ -152,32 +152,7 @@ bool DecodeWeather(WiFiClient& json, String Type) {
   // convert it to a JsonObject
   JsonObject root = doc.as<JsonObject>();
   Serial.println(" Decoding " + Type + " data");
-  if (Type == "weather") {
-    // All Serial.println statements are for diagnostic purposes and not required, remove if not needed
-    WxConditions[0].lon         = root["coord"]["lon"].as<float>();              Serial.println(" Lon: "+String(WxConditions[0].lon));
-    WxConditions[0].lat         = root["coord"]["lat"].as<float>();              Serial.println(" Lat: "+String(WxConditions[0].lat));
-    WxConditions[0].Main0       = root["weather"][0]["main"].as<String>();        Serial.println("Main: "+String(WxConditions[0].Main0));
-    WxConditions[0].Forecast0   = root["weather"][0]["description"].as<String>(); Serial.println("For0: "+String(WxConditions[0].Forecast0));
-    WxConditions[0].Forecast1   = root["weather"][1]["description"].as<String>(); Serial.println("For1: "+String(WxConditions[0].Forecast1));
-    WxConditions[0].Forecast2   = root["weather"][2]["description"].as<String>(); Serial.println("For2: "+String(WxConditions[0].Forecast2));
-    WxConditions[0].Icon        = root["weather"][0]["icon"].as<String>();        Serial.println("Icon: "+String(WxConditions[0].Icon));
-    WxConditions[0].Temperature = root["main"]["temp"].as<float>();              Serial.println("Temp: "+String(WxConditions[0].Temperature));
-    WxConditions[0].Feelslike   = root["main"]["feels_like"].as<float>();                    Serial.println("FLik: "+String(WxConditions[0].Feelslike));
-    WxConditions[0].Pressure    = root["main"]["pressure"].as<float>();          Serial.println("Pres: "+String(WxConditions[0].Pressure));
-    WxConditions[0].Humidity    = root["main"]["humidity"].as<float>();          Serial.println("Humi: "+String(WxConditions[0].Humidity));
-    WxConditions[0].Low         = root["main"]["temp_min"].as<float>();          Serial.println("TLow: "+String(WxConditions[0].Low));
-    WxConditions[0].High        = root["main"]["temp_max"].as<float>();          Serial.println("THig: "+String(WxConditions[0].High));
-    WxConditions[0].Windspeed   = root["wind"]["speed"].as<float>();             Serial.println("WSpd: "+String(WxConditions[0].Windspeed));
-    WxConditions[0].Winddir     = root["wind"]["deg"].as<float>();               Serial.println("WDir: "+String(WxConditions[0].Winddir));
-    WxConditions[0].Cloudcover  = root["clouds"]["all"].as<int>();               Serial.println("CCov: "+String(WxConditions[0].Cloudcover)); // in % of cloud cover
-    WxConditions[0].Visibility  = root["visibility"].as<int>();                  Serial.println("Visi: "+String(WxConditions[0].Visibility)); // in metres
-    WxConditions[0].Rainfall    = root["rain"]["1h"].as<float>();                Serial.println("Rain: "+String(WxConditions[0].Rainfall));
-    WxConditions[0].Snowfall    = root["snow"]["1h"].as<float>();                Serial.println("Snow: "+String(WxConditions[0].Snowfall));
-    WxConditions[0].Country     = root["sys"]["country"].as<String>();            Serial.println("Ctry: "+String(WxConditions[0].Country));
-    WxConditions[0].Sunrise     = root["sys"]["sunrise"].as<int>();              Serial.println("SRis: "+String(WxConditions[0].Sunrise));
-    WxConditions[0].Sunset      = root["sys"]["sunset"].as<int>();               Serial.println("SSet: "+String(WxConditions[0].Sunset));
-    WxConditions[0].Timezone    = root["timezone"].as<int>();                    Serial.println("TZon: "+String(WxConditions[0].Timezone));  
-  }
+  
   if (Type == "onecall") {
     // All Serial.println statements are for diagnostic purposes and some are not required, remove if not needed with //
     WxConditions[0].High        = -50; // Minimum forecast low
@@ -355,7 +330,7 @@ bool DecodeWeather(WiFiClient& json, String Type) {
   return true;
 }
 
-bool DecodeWeather(String json, String Type) {
+bool DecodeWeatherTomorrowIo(String json, String Type) {
   Serial.print(F("\nCreating object... "));
 
   Serial.print(F("ESP.getFreeHeap() = "));
@@ -403,7 +378,6 @@ bool DecodeWeather(String json, String Type) {
     rain_readings_count = daily_readings_count;
     snow_readings_count = daily_readings_count;
 
-    // FIXME fix precipitation
     for (byte r = 0; r < max_readings; r++) 
     {
       Serial.println("--------------");
@@ -418,9 +392,10 @@ bool DecodeWeather(String json, String Type) {
       if (Units == "I") pressure_readings[r] = WxForecast[r].Pressure * 0.02953;   else pressure_readings[r] = WxForecast[r].Pressure;
       if (Units == "R") pressure_readings[r] = WxForecast[r].Pressure * 0.75006;   else pressure_readings[r] = WxForecast[r].Pressure;
 
-      if (Units == "I") rain_readings[r] = WxForecast[r].Rainfall * 0.02953;   else rain_readings[r] = WxForecast[r].Rainfall;
-      if (Units == "I") snow_readings[r] = WxForecast[r].Snowfall * 0.02953;   else snow_readings[r] = WxForecast[r].Rainfall;
-      humidity_readings[r] = WxForecast[r].Humidity;
+      rain_readings[r]        = WxForecast[r].Rainfall;
+      snow_readings[r]        = WxForecast[r].Snowfall; 
+      
+      humidity_readings[r]    = WxForecast[r].Humidity;
       temperature_readings[r] = WxForecast[r].Temperature;
     }
 
@@ -455,7 +430,7 @@ bool DecodeWeather(String json, String Type) {
 
 void decodeTomorrowIoInterval(Forecast_record_type * forecast, JsonObject interval)
 {
-    forecast->Period           = interval["startTime"].as<String>();                 Serial.println("Peri: " + String(forecast->Period));
+    forecast->Period           = interval["startTime"].as<String>();                Serial.println("Peri: " + String(forecast->Period));
     forecast->Temperature      = interval["values"]["temperature"];                 Serial.println("Temp: " + String(forecast->Temperature));
     forecast->Feelslike        = interval["values"]["temperatureApparent"];         Serial.println("FLik: " + String(forecast->Feelslike)); 
     forecast->Pressure         = interval["values"]["pressureSurfaceLevel"];        Serial.println("Pres: " + String(forecast->Pressure));
@@ -482,7 +457,7 @@ void decodeTomorrowIoInterval(Forecast_record_type * forecast, JsonObject interv
 
 void decodeTomorrowIoPrecipitation(Forecast_record_type * forecast, JsonArray intervals, int position, int count)
 {
-    for (int i = 0; i < intervals; i++)
+    for (int i = 0; i < count; i++)
     {
       JsonObject interval = intervals[position + i];
       
@@ -493,8 +468,9 @@ void decodeTomorrowIoPrecipitation(Forecast_record_type * forecast, JsonArray in
         // 3: Freezing Rain
         // 4: Ice Pellets
       
-      int precipitationType = interval["values"]["precipitationType"];
-      float precipitationIntensity = interval["values"]["precipitationIntensity"];
+      // Serial.println(interval["values"].as<String>());
+      int precipitationType = interval["values"]["precipitationType"].as<float>();
+      float precipitationIntensity = interval["values"]["precipitationIntensity"].as<float>();
       if (precipitationType == 2 || precipitationType == 4)
       {
         forecast->Snowfall += precipitationIntensity;                                 Serial.println("Snow: " + String(precipitationIntensity));
@@ -504,6 +480,8 @@ void decodeTomorrowIoPrecipitation(Forecast_record_type * forecast, JsonArray in
         forecast->Rainfall += precipitationIntensity;                                 Serial.println("Rain: " + String(precipitationIntensity));
       }
     }
+    Serial.println("Snow : " + String(forecast->Snowfall));
+    Serial.println("Rain : " + String(forecast->Rainfall));
 }
 
 
@@ -597,8 +575,8 @@ bool obtain_wx_data_tomorrowIo(WiFiClientSecure& client, const String& RequestTy
   int httpCode = http.GET();
   if(httpCode == HTTP_CODE_OK) {
     String json = http.getString();
-    Serial.print(json);
-    if (!DecodeWeather(json, RequestType)) return false;
+    // Serial.print(json);
+    if (!DecodeWeatherTomorrowIo(json, RequestType)) return false;
     client.stop();
     http.end();
     return true;
