@@ -453,7 +453,7 @@ void decodeTomorrowIoInterval(Forecast_record_type * forecast, JsonObject interv
       forecast->Icon      = tomorrow_io_weather_icon(String(WeatherCode).c_str());  Serial.println("Icon: " + String(forecast->Icon));
     }
     forecast->High = forecast->Low = forecast->Temperature;
-    forecast->Dt = tomorrowIoToUnixTime(forecast->Period.c_str(), posixTZ);                 Serial.println("Dt  : " + String(forecast->Dt));
+    forecast->Dt = tomorrowIoToUnixTime(forecast->Period.c_str(), NULL);                 Serial.println("Dt  : " + String(forecast->Dt));
 }
 
 
