@@ -91,7 +91,7 @@ char tomorrow_io_openw_translations[][3][20] = {
 
 void decodeTomorrowIoInterval(Forecast_record_type * forecast, JsonObject values);
 void decodeTomorrowIoPrecipitation(Forecast_record_type * forecast, JsonArray intervals, int position, int count);
-int tomorrowIoToUnixTime(const char * tomorrowIo_Time);
+int tomorrowIoToUnixTime(const char * tomorrowIo_Time, const char * posixTZ);
 
 String tomorrow_io_weather_decode(const char * code, const int index)
 {
@@ -330,7 +330,7 @@ bool DecodeWeather(WiFiClient& json, String Type) {
   return true;
 }
 
-bool DecodeWeatherTomorrowIo(String json, String Type) {
+bool DecodeWeatherTomorrowIo(String json, String Type, const char * posixTZ) {
   Serial.print(F("\nCreating object... "));
 
   Serial.print(F("ESP.getFreeHeap() = "));
@@ -421,16 +421,16 @@ bool DecodeWeatherTomorrowIo(String json, String Type) {
     JsonArray currentIntervals = currentStep["intervals"];
     JsonObject current = currentIntervals[0];
   
-    WxConditions[0].Sunrise     = tomorrowIoToUnixTime(current["values"]["sunriseTime"].as<String>().c_str()); Serial.println("SRis: "+String(WxConditions[0].Sunrise));
-    WxConditions[0].Sunset      = tomorrowIoToUnixTime(current["values"]["sunsetTime"].as<String>().c_str());  Serial.println("SSet: "+String(WxConditions[0].Sunset));
+    WxConditions[0].Sunrise     = tomorrowIoToUnixTime(current["values"]["sunriseTime"].as<String>().c_str(), posixTZ); Serial.println("SRis: "+String(WxConditions[0].Sunrise));
+    WxConditions[0].Sunset      = tomorrowIoToUnixTime(current["values"]["sunsetTime"].as<String>().c_str(), posixTZ);  Serial.println("SSet: "+String(WxConditions[0].Sunset));
   }
 
   return true;
 }
 
-void decodeTomorrowIoInterval(Forecast_record_type * forecast, JsonObject interval)
+void decodeTomorrowIoInterval(Forecast_record_type * forecast, JsonObject interval, const char * posixTZ)
 {
-    forecast->Period           = interval["startTime"].as<String>();                Serial.println("Peri: " + String(forecast->Period));
+    forecast->Period           = interval["time"].as<String>();                     Serial.println("Peri: " + String(forecast->Period));
     forecast->Temperature      = interval["values"]["temperature"];                 Serial.println("Temp: " + String(forecast->Temperature));
     forecast->Feelslike        = interval["values"]["temperatureApparent"];         Serial.println("FLik: " + String(forecast->Feelslike)); 
     forecast->Pressure         = interval["values"]["pressureSurfaceLevel"];        Serial.println("Pres: " + String(forecast->Pressure));
@@ -451,7 +451,7 @@ void decodeTomorrowIoInterval(Forecast_record_type * forecast, JsonObject interv
       forecast->Icon      = tomorrow_io_weather_icon(String(WeatherCode).c_str());  Serial.println("Icon: " + String(forecast->Icon));
     }
     forecast->High = forecast->Low = forecast->Temperature;
-    forecast->Dt = tomorrowIoToUnixTime(forecast->Period.c_str());                 Serial.println("Dt  : " + String(forecast->Dt));
+    forecast->Dt = tomorrowIoToUnixTime(forecast->Period.c_str(), posixTZ);                 Serial.println("Dt  : " + String(forecast->Dt));
 }
 
 
@@ -485,31 +485,26 @@ void decodeTomorrowIoPrecipitation(Forecast_record_type * forecast, JsonArray in
 }
 
 
-int tomorrowIoToUnixTime(const char * tomorrowIoTime)
+int tomorrowIoToUnixTime(const char * tomorrowIoTime, const char * posixTZ)
 {
     struct tm tm;
     time_t ts = 0;
     memset(&tm, 0, sizeof(tm));
     strptime(tomorrowIoTime, "%Y-%m-%dT%H:%M:%S+%z:00", &tm);
     tm.tm_isdst = -1;
-    Serial.println(tm.tm_hour);
-    Serial.println(tm.tm_isdst);
+    Serial.printf(
+        "tomorrowIoToUnixTime: [%s] => hour=%d, min=%d, dst=%d\n", 
+        tomorrowIoTime, tm.tm_hour, tm.tm_min, tm.tm_isdst);
     return mktime(&tm);
 }
 
 
 //#########################################################################################
-String ConvertUnixTime(int unix_time, int gmt_offset = 0, int dst_offset = 0) {
+String ConvertUnixTime(int unix_time) {
   // Returns either '21:12  ' or ' 09:12pm' depending on Units mode
   
   time_t tm = unix_time;
   struct tm *now_tm = localtime(&tm);
-  now_tm->tm_hour = now_tm->tm_hour + gmt_offset;
-  // if (now_tm->tm_isdst)
-  // {
-    // now_tm->tm_hour = now_tm->tm_hour + dst_offset;
-  // }
-  mktime(now_tm);
   char output[40];
   if (Units == "M" || Units == "R") {
     strftime(output, sizeof(output), "%H:%M %d/%m/%y", now_tm);
@@ -551,7 +546,7 @@ bool obtain_wx_data_accuweather(WiFiClient& client, const String& RequestType,
 
 bool obtain_wx_data_tomorrowIo(WiFiClientSecure& client, const String& RequestType, 
     tm * p_current_time, int hours_to_fetch, 
-    const String& tomorrowIoKey, const String& latitude, const String& longitude, const String& tomorrowIoTimezone)
+    const String& tomorrowIoKey, const String& latitude, const String& longitude, const String& tomorrowIoTimezone, const char * posixTZ)
 {
   client.stop(); // close connection before sending a new request
   HTTPClient http;
@@ -583,7 +578,7 @@ bool obtain_wx_data_tomorrowIo(WiFiClientSecure& client, const String& RequestTy
   if(httpCode == HTTP_CODE_OK) {
     String json = http.getString();
     // Serial.print(json);
-    if (!DecodeWeatherTomorrowIo(json, RequestType)) return false;
+    if (!DecodeWeatherTomorrowIo(json, RequestType, posixTZ)) return false;
     client.stop();
     http.end();
     return true;
