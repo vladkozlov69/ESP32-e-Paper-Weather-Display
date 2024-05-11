@@ -499,10 +499,17 @@ int tomorrowIoToUnixTime(const char * tomorrowIoTime)
 
 
 //#########################################################################################
-String ConvertUnixTime(int unix_time) {
+String ConvertUnixTime(int unix_time, int gmt_offset = 0, int dst_offset = 0) {
   // Returns either '21:12  ' or ' 09:12pm' depending on Units mode
+  
   time_t tm = unix_time;
   struct tm *now_tm = localtime(&tm);
+  now_tm->tm_hour = now_tm->tm_hour + gmt_offset;
+  // if (now_tm->tm_isdst)
+  // {
+    // now_tm->tm_hour = now_tm->tm_hour + dst_offset;
+  // }
+  mktime(now_tm);
   char output[40];
   if (Units == "M" || Units == "R") {
     strftime(output, sizeof(output), "%H:%M %d/%m/%y", now_tm);
