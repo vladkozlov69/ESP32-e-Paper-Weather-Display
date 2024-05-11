@@ -8,6 +8,8 @@
 #include "forecast_record.h"
 #include "common_functions.h"
 
+#include "../lib/ezTime/src/ezTime.h"
+
 // char      *_EXFUN(strptime,     (const char *__restrict,
 // 				 const char *__restrict,
 // 				 struct tm *__restrict));
@@ -89,7 +91,7 @@ char tomorrow_io_openw_translations[][3][20] = {
   {"8000", "11d", "Thunderstorm"}
 };
 
-void decodeTomorrowIoInterval(Forecast_record_type * forecast, JsonObject values);
+void decodeTomorrowIoInterval(Forecast_record_type * forecast, JsonObject values, const char * posixTZ);
 void decodeTomorrowIoPrecipitation(Forecast_record_type * forecast, JsonArray intervals, int position, int count);
 int tomorrowIoToUnixTime(const char * tomorrowIo_Time, const char * posixTZ);
 
@@ -369,7 +371,7 @@ bool DecodeWeatherTomorrowIo(String json, String Type, const char * posixTZ) {
 
     WxConditions[0].High        = -50; // Minimum forecast low
     WxConditions[0].Low         = 50;  // Maximum Forecast High
-    decodeTomorrowIoInterval(&(WxConditions[0]), currentIntervals[0]);
+    decodeTomorrowIoInterval(&(WxConditions[0]), currentIntervals[0], posixTZ);
 
     size_t daily_readings_count = max_readings;
     pressure_readings_count = daily_readings_count;
@@ -381,7 +383,7 @@ bool DecodeWeatherTomorrowIo(String json, String Type, const char * posixTZ) {
     for (byte r = 0; r < max_readings; r++) 
     {
       Serial.println("--------------");
-      decodeTomorrowIoInterval(&(WxForecast[r]), forecastIntervals[r * 3 + 2]);
+      decodeTomorrowIoInterval(&(WxForecast[r]), forecastIntervals[r * 3 + 2], posixTZ);
       decodeTomorrowIoPrecipitation(&(WxForecast[r]), forecastIntervals, r * 3, 3);
 
       if (r < 8) { // Check next 3 x 8 Hours = 1 day
@@ -430,7 +432,7 @@ bool DecodeWeatherTomorrowIo(String json, String Type, const char * posixTZ) {
 
 void decodeTomorrowIoInterval(Forecast_record_type * forecast, JsonObject interval, const char * posixTZ)
 {
-    forecast->Period           = interval["time"].as<String>();                     Serial.println("Peri: " + String(forecast->Period));
+    forecast->Period           = interval["startTime"].as<String>();                Serial.println("Peri: " + String(forecast->Period));
     forecast->Temperature      = interval["values"]["temperature"];                 Serial.println("Temp: " + String(forecast->Temperature));
     forecast->Feelslike        = interval["values"]["temperatureApparent"];         Serial.println("FLik: " + String(forecast->Feelslike)); 
     forecast->Pressure         = interval["values"]["pressureSurfaceLevel"];        Serial.println("Pres: " + String(forecast->Pressure));
@@ -493,9 +495,21 @@ int tomorrowIoToUnixTime(const char * tomorrowIoTime, const char * posixTZ)
     strptime(tomorrowIoTime, "%Y-%m-%dT%H:%M:%S+%z:00", &tm);
     tm.tm_isdst = -1;
     Serial.printf(
-        "tomorrowIoToUnixTime: [%s] => hour=%d, min=%d, dst=%d\n", 
-        tomorrowIoTime, tm.tm_hour, tm.tm_min, tm.tm_isdst);
-    return mktime(&tm);
+        "tomorrowIoToUnixTime: [%s] => hour=%d, min=%d\n", 
+        tomorrowIoTime, tm.tm_hour, tm.tm_min);
+    if (posixTZ == NULL)
+    {
+        return mktime(&tm);
+    }
+    else
+    {
+        Timezone local;
+        local.setPosix(posixTZ);
+        String tzname;
+        bool is_dst;
+        int16_t offset;
+        return local.tzTime(mktime(&tm), ezLocalOrUTC_t::UTC_TIME, tzname, is_dst, offset);
+    }
 }
 
 
